@@ -1,6 +1,6 @@
 {
     "name": "phone-finder",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "type": "module",
     "description": "Find phone numbers and related information using the Tomba API.",
     "engines": {
@@ -19,6 +19,7 @@
         "eslint-config-prettier": "^10.1.5",
         "globals": "^16.2.0",
         "prettier": "^3.5.3",
+        "standard-version": "^9.5.0",
         "tsx": "^4.20.3",
         "typescript": "^5.8.3",
         "typescript-eslint": "^8.34.1"
@@ -32,6 +33,7 @@
         "lint:fix": "eslint --fix",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
+        "release": "standard-version  && git push --follow-tags origin main",
         "test": "echo \"Error: oops, the Actor has no tests yet, sad!\" && exit 1"
     },
     "author": "It's not you it's me",
