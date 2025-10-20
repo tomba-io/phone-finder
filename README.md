@@ -98,4 +98,51 @@ Each search query can contain one or more of:
 - **Search Variety**: Use different search methods (email, domain, LinkedIn) for better coverage
 - **Rate Limits**: The Actor automatically handles Tomba's 150 requests/minute limit
 - **Batch Size**: Process 10-50 queries at a time for optimal performance
-- A short guide on how to build web scrapers using code templates:
+
+## Output Data Structure
+
+The Actor returns detailed phone number information for each successful search:
+
+### Example Output
+
+```json
+{
+    "email": "john@example.com",
+    "domain": "example.com",
+    "linkedin": "https://linkedin.com/in/johndoe",
+    "valid": true,
+    "local_format": "(555) 123-4567",
+    "intl_format": "+1 555 123 4567",
+    "e164_format": "+15551234567",
+    "rfc3966_format": "tel:+1-555-123-4567",
+    "country_code": "US",
+    "line_type": "mobile",
+    "carrier": "Verizon Wireless",
+    "timezones": ["America/New_York"],
+    "source": {
+        "search_type": "email",
+        "search_value": "john@example.com"
+    }
+}
+```
+
+### Data Fields Explained
+
+- **Email/Domain/LinkedIn**: Associated identifiers for the phone number
+- **Valid**: Boolean indicating if the phone number is valid
+- **Formatting Options**: Phone number in various standard formats
+    - `local_format`: Local/national format (e.g., "(555) 123-4567")
+    - `intl_format`: International format (e.g., "+1 555 123 4567")
+    - `e164_format`: E.164 standard format (e.g., "+15551234567")
+    - `rfc3966_format`: RFC3966 URI format (e.g., "tel:+1-555-123-4567")
+- **Location Info**: Country code and timezone information
+- **Carrier Details**: Phone carrier and line type (mobile, landline, etc.)
+- **Source Tracking**: Which search method and value led to this discovery
+
+## Use Cases
+
+- **Sales Outreach**: Find phone numbers for email contacts in your CRM
+- **Recruitment**: Contact candidates via phone using their LinkedIn profiles
+- **Lead Generation**: Discover phone numbers for domain-based prospecting
+- **Contact Enrichment**: Add phone numbers to existing contact databases
+- **Verification**: Validate phone numbers associated with email addresses
