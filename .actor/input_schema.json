@@ -1,0 +1,72 @@
+{
+    "title": "Tomba Phone Finder Actor Input",
+    "description": "Input schema for the Tomba Phone Finder Actor that discovers phone numbers using the Tomba API.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "tombaApiKey": {
+            "title": "Tomba API Key",
+            "type": "string",
+            "description": "Your Tomba API key (ta_xxxx). Get it from https://app.tomba.io/api",
+            "editor": "textfield",
+            "isSecret": true,
+            "example": "ta_xxxxxxxxxxxxxxxxxxxx"
+        },
+        "tombaApiSecret": {
+            "title": "Tomba Secret Key",
+            "type": "string",
+            "description": "Your Tomba secret key (ts_xxxx). Get it from https://app.tomba.io/api",
+            "editor": "textfield",
+            "isSecret": true,
+            "example": "ts_xxxxxxxxxxxxxxxxxxxx"
+        },
+        "searches": {
+            "title": "Search Queries",
+            "type": "array",
+            "description": "Array of search queries to find phone numbers. Each query can contain email, domain, or LinkedIn profile.",
+            "editor": "json",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "title": "Email Address",
+                        "type": "string",
+                        "description": "Email address to find phone number for"
+                    },
+                    "domain": {
+                        "title": "Domain",
+                        "type": "string",
+                        "description": "Domain to search for phone numbers"
+                    },
+                    "linkedin": {
+                        "title": "LinkedIn Profile",
+                        "type": "string",
+                        "description": "LinkedIn profile URL to find phone number for"
+                    }
+                }
+            },
+            "example": [
+                {
+                    "email": "john@example.com"
+                },
+                {
+                    "domain": "example.com"
+                },
+                {
+                    "linkedin": "https://linkedin.com/in/johndoe"
+                }
+            ]
+        },
+        "maxResults": {
+            "title": "Maximum Results",
+            "type": "integer",
+            "description": "Maximum number of phone numbers to find. Default is 50.",
+            "editor": "number",
+            "minimum": 1,
+            "maximum": 1000,
+            "default": 50,
+            "example": 50
+        }
+    },
+    "required": ["tombaApiKey", "tombaApiSecret", "searches"]
+}

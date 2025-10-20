@@ -1,0 +1,134 @@
+{
+    "actorSpecification": 1,
+    "fields": {
+        "type": "object",
+        "properties": {
+            "email": {
+                "type": ["string", "null"],
+                "description": "Email address associated with the phone number"
+            },
+            "domain": {
+                "type": ["string", "null"],
+                "description": "Domain associated with the phone number"
+            },
+            "linkedin": {
+                "type": ["string", "null"],
+                "description": "LinkedIn profile associated with the phone number"
+            },
+            "valid": {
+                "type": ["boolean", "null"],
+                "description": "Whether the phone number is valid"
+            },
+            "local_format": {
+                "type": ["string", "null"],
+                "description": "Phone number in local format"
+            },
+            "intl_format": {
+                "type": ["string", "null"],
+                "description": "Phone number in international format"
+            },
+            "e164_format": {
+                "type": ["string", "null"],
+                "description": "Phone number in E.164 format"
+            },
+            "rfc3966_format": {
+                "type": ["string", "null"],
+                "description": "Phone number in RFC3966 format"
+            },
+            "country_code": {
+                "type": ["string", "null"],
+                "description": "Country code of the phone number"
+            },
+            "line_type": {
+                "type": ["string", "null"],
+                "description": "Type of phone line (mobile, landline, etc.)"
+            },
+            "carrier": {
+                "type": ["string", "null"],
+                "description": "Phone carrier/provider information"
+            },
+            "timezones": {
+                "type": ["array", "null"],
+                "description": "Timezone information for the phone number location",
+                "items": {
+                    "type": "string"
+                }
+            },
+            "source": {
+                "type": ["object", "null"],
+                "description": "Source information used to find this phone number",
+                "properties": {
+                    "search_type": {
+                        "type": ["string", "null"],
+                        "description": "Type of search performed (email, domain, linkedin)"
+                    },
+                    "search_value": {
+                        "type": ["string", "null"],
+                        "description": "Value used in the search query"
+                    }
+                }
+            }
+        },
+        "required": ["valid"]
+    },
+    "views": {
+        "overview": {
+            "title": "Overview",
+            "transformation": {
+                "fields": ["email", "domain", "linkedin", "intl_format", "line_type", "carrier", "valid", "source"]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "email": {
+                        "label": "Email"
+                    },
+                    "domain": {
+                        "label": "Domain"
+                    },
+                    "linkedin": {
+                        "label": "LinkedIn"
+                    },
+                    "intl_format": {
+                        "label": "Phone Number"
+                    },
+                    "line_type": {
+                        "label": "Type"
+                    },
+                    "carrier": {
+                        "label": "Carrier"
+                    },
+                    "valid": {
+                        "label": "Valid"
+                    },
+                    "source": {
+                        "label": "Source"
+                    }
+                }
+            }
+        },
+        "detailed": {
+            "title": "Detailed View",
+            "transformation": {
+                "fields": [
+                    "email",
+                    "domain",
+                    "linkedin",
+                    "valid",
+                    "local_format",
+                    "intl_format",
+                    "e164_format",
+                    "rfc3966_format",
+                    "country_code",
+                    "line_type",
+                    "carrier",
+                    "timezones",
+                    "source"
+                ]
+            },
+            "display": {
+                "component": "table"
+            }
+        }
+    }
+}
