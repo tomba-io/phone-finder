@@ -49,10 +49,10 @@ For each discovered phone number, you'll receive:
 ### Required Parameters
 
 | Parameter        | Type     | Description                     |
-| ---------------- | -------- | ------------------------------- | ----------------------- |
+| ---------------- | -------- | ------------------------------- |
 | `tombaApiKey`    | `string` | Your Tomba API key (ta_xxxx)    |
 | `tombaApiSecret` | `string` | Your Tomba secret key (ts_xxxx) |
-| `searches`       | `array`  | `[]`                            | Array of search queries |
+| `searches`       | `array`  | Array of search queries         |
 
 ### Optional Parameters
 
