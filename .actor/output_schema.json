@@ -1,0 +1,14 @@
+{
+    "actorOutputSchemaVersion": 1,
+    "title": "Phone Finder Output",
+    "description": "Output from Tomba Phone Finder Actor - phone numbers discovered for domains and companies",
+    "type": "object",
+    "properties": {
+        "results": {
+            "type": "string",
+            "title": "Phone Discovery Results",
+            "description": "Found phone numbers with carrier and location information",
+            "template": "{{links.apiDefaultDatasetUrl}}/items"
+        }
+    }
+}
