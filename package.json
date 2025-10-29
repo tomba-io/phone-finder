@@ -8,7 +8,6 @@
     },
     "dependencies": {
         "apify": "^3.4.2",
-        "crawlee": "^3.13.8",
         "tomba": "^1.0.4"
     },
     "devDependencies": {
