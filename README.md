@@ -147,6 +147,86 @@ The Actor returns detailed phone number information for each successful search:
 - **Contact Enrichment**: Add phone numbers to existing contact databases
 - **Verification**: Validate phone numbers associated with email addresses
 
+## FAQ
+
+### General Questions
+
+**Q: How does phone finding work?**
+A: Phone finding searches for phone numbers associated with email addresses, domains, or LinkedIn profiles using public sources and professional databases.
+
+**Q: What information do I need to find a phone number?**
+A: You can search using an email address, company domain, or LinkedIn profile URL. Different search methods have varying success rates.
+
+**Q: How accurate are the found phone numbers?**
+A: Accuracy varies by search method and data availability. Email-based searches typically yield the highest accuracy, followed by LinkedIn and domain searches.
+
+### Search Methods
+
+**Q: Which search method is most effective?**
+A: Email-based searches are typically most accurate since they target specific individuals. LinkedIn searches are good for professional contacts, while domain searches cast a wider net.
+
+**Q: Can I search for multiple phone numbers at once?**
+A: Yes, you can provide multiple search queries in the `searches` array. The Actor processes them efficiently while respecting rate limits.
+
+**Q: What if a phone number isn't found?**
+A: Not all contacts have publicly discoverable phone numbers. The result will show no phone data, which is normal for privacy-conscious individuals or companies.
+
+**Q: Do you find both mobile and landline numbers?**
+A: Yes, when available, results include both mobile phones and office/landline numbers, along with the phone type identification.
+
+### Technical Questions
+
+**Q: What are the rate limits?**
+A: The Actor automatically handles Tomba's rate limits. Phone finding typically allows for efficient batch processing of multiple searches.
+
+**Q: How should I format LinkedIn URLs?**
+A: Use standard LinkedIn profile URLs like "https://linkedin.com/in/username". Both full URLs and just the username part work.
+
+**Q: Can I specify which type of phone numbers to find?**
+A: The API returns all available phone numbers with type information (mobile, work, etc.). You can filter results based on your needs.
+
+**Q: What happens with invalid search parameters?**
+A: Invalid emails, domains, or LinkedIn URLs will return empty results. The Actor continues processing other valid searches in your batch.
+
+### Data Quality & Privacy
+
+**Q: Where do the phone numbers come from?**
+A: Phone numbers are sourced from publicly available information including business websites, professional profiles, and legitimate contact databases.
+
+**Q: Is phone finding GDPR compliant?**
+A: Yes, the service only accesses publicly available information and follows privacy regulations. Always ensure you have permission to contact people using found numbers.
+
+**Q: How current are the phone numbers?**
+A: Data freshness varies, but results include timestamps when available. Some phone numbers may be outdated, so verification is recommended for critical use cases.
+
+**Q: Can I verify the found phone numbers?**
+A: While this Actor finds phone numbers, you can use the Phone Validator actor to verify their current validity and status.
+
+### Business Use Cases
+
+**Q: Can I use this for cold calling?**
+A: Yes, but ensure compliance with local telemarketing laws (Do Not Call registries, TCPA, etc.). Always respect privacy preferences and include opt-out options.
+
+**Q: Is this useful for customer support?**
+A: Yes, you can use it to find alternative contact methods for customers when email isn't responsive or for urgent matters requiring phone contact.
+
+**Q: How does this help with lead qualification?**
+A: Phone contact often indicates higher-quality leads. Having multiple contact methods (email + phone) typically improves conversion rates.
+
+**Q: Can I integrate this with my CRM?**
+A: Yes, the JSON output can be easily integrated with CRM systems to enrich existing contact records with phone number data.
+
+### Troubleshooting
+
+**Q: Why am I getting few results?**
+A: Phone number availability varies by region, company privacy policies, and individual preferences. Try different search methods for better coverage.
+
+**Q: How do I handle different phone number formats?**
+A: Results include phone numbers in various formats. Consider normalizing formats based on your needs (international vs. local format).
+
+**Q: What if I need higher success rates?**
+A: Combine multiple search methods, ensure accurate input data, and consider using the results alongside other data enrichment tools for comprehensive contact information.
+
 ## Keywords
 
 phone finder, phone discovery, contact phone numbers, phone search, mobile finder, contact enrichment, phone lookup, business phone numbers, lead generation, sales outreach, contact validation, telecommunications
