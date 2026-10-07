@@ -1,12 +1,15 @@
 // Shared test harness for the Tomba Apify Actors.
 // Keep this file identical across all Actors.
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { createServer, request as httpRequest } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+import { Ajv } from 'ajv';
 
 export interface MockRequest {
     method: string;
@@ -159,6 +162,7 @@ export async function runActor(options: RunOptions): Promise<RunResult> {
     });
 
     const items = await readDataset(storageDir, 'default');
+    assertMatchesDatasetSchema(items);
     const charges = (await readDataset(storageDir, 'charging_log')) as ChargeLogEntry[];
     const chargeCounts: Record<string, number> = {};
     for (const c of charges) chargeCounts[c.eventName] = (chargeCounts[c.eventName] ?? 0) + (c.chargedCount ?? 1);
@@ -315,4 +319,28 @@ export async function startStandbyActor(
             return { output, chargeCounts };
         },
     };
+}
+
+let datasetValidator: ReturnType<Ajv['compile']> | undefined;
+
+/**
+ * Apify validates every pushed item against `.actor/dataset_schema.json` and fails the run on a mismatch,
+ * while local runs don't. Check the items the same way so schema mismatches fail the tests.
+ */
+export function assertMatchesDatasetSchema(items: Record<string, unknown>[]): void {
+    if (!datasetValidator) {
+        const { fields } = JSON.parse(readFileSync(join(process.cwd(), '.actor/dataset_schema.json'), 'utf8'));
+        delete fields.$schema;
+        datasetValidator = new Ajv({ allErrors: true, strict: false }).compile(fields);
+    }
+    for (const [index, item] of items.entries()) {
+        if (!datasetValidator(item)) {
+            const errors = (datasetValidator.errors ?? [])
+                .map((e) => `${e.instancePath || '/'} ${e.message}`)
+                .join('; ');
+            throw new Error(
+                `Dataset item ${index} doesn't match .actor/dataset_schema.json: ${errors}\n${JSON.stringify(item)}`,
+            );
+        }
+    }
 }
