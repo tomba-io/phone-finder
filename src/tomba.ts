@@ -177,7 +177,9 @@ export async function callTomba(
     }
 
     // Reserve budget before calling Tomba so concurrent workers never exceed the user's max charge.
-    if (!reserve(eventName)) {
+    // A fixed count is known up front, so reserve all of it; a body-dependent count reserves at least 1.
+    const reserved = typeof count === 'number' ? Math.max(1, Math.ceil(count)) : 1;
+    if (!reserve(eventName, reserved)) {
         stop();
         return { status: 0, charged: false, cached: false, skipped: true, error: 'Max charge limit reached' };
     }
@@ -221,7 +223,7 @@ export async function callTomba(
             }
         }
     } finally {
-        release(eventName);
+        release(eventName, reserved);
     }
 }
 
@@ -299,18 +301,18 @@ async function charge(eventName: string, count: number): Promise<number> {
     return result.chargedCount;
 }
 
-function reserve(eventName: string): boolean {
+function reserve(eventName: string, units: number): boolean {
     if (stopped) return false;
     const manager = Actor.getChargingManager();
     const remaining = manager.calculateMaxEventChargeCountWithinLimit(eventName);
     const current = inFlight.get(eventName) ?? 0;
-    if (remaining - current < 1) return false;
-    inFlight.set(eventName, current + 1);
+    if (remaining - current < units) return false;
+    inFlight.set(eventName, current + units);
     return true;
 }
 
-function release(eventName: string): void {
-    inFlight.set(eventName, Math.max(0, (inFlight.get(eventName) ?? 1) - 1));
+function release(eventName: string, units: number): void {
+    inFlight.set(eventName, Math.max(0, (inFlight.get(eventName) ?? units) - units));
 }
 
 async function readCache(key: string): Promise<Record<string, unknown> | undefined> {
