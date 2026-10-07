@@ -344,3 +344,17 @@ export function assertMatchesDatasetSchema(items: Record<string, unknown>[]): vo
         }
     }
 }
+
+/**
+ * Validate an input against `.actor/input_schema.json` (Apify validates the input before a run or API call
+ * starts). Returns the error messages; empty when the input is accepted.
+ */
+export function inputSchemaErrors(input: Record<string, unknown>): string[] {
+    const schema = JSON.parse(readFileSync(join(process.cwd(), '.actor/input_schema.json'), 'utf8'));
+    const validate = new Ajv({ allErrors: true, strict: false }).compile({
+        type: 'object',
+        properties: schema.properties,
+        required: schema.required ?? [],
+    });
+    return validate(input) ? [] : (validate.errors ?? []).map((e) => `${e.instancePath || '/'} ${e.message}`);
+}
