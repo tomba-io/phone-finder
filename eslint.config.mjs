@@ -13,7 +13,7 @@ export default [
         languageOptions: {
             parser: tsEslint.parser,
             parserOptions: {
-                project: 'tsconfig.json',
+                project: 'tsconfig.eslint.json',
             },
             globals: {
                 ...globals.node,
@@ -25,6 +25,13 @@ export default [
         },
         rules: {
             'no-console': 0,
+        },
+    },
+    {
+        // node:test's describe/it return promises by design.
+        files: ['test/**/*.ts'],
+        rules: {
+            '@typescript-eslint/no-floating-promises': 0,
         },
     },
 ];

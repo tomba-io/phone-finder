@@ -1,41 +1,91 @@
-## Getting started
+# Development
 
-For complete information [see this article](https://docs.apify.com/platform/actors/development#build-actor-locally). To run the Actor use the following command:
+Notes for maintainers of the Tomba Phone Finder Actor. The README is the end-user page shown on Apify Store.
+
+## Requirements
+
+- Node.js 20+
+- [Apify CLI](https://docs.apify.com/cli) for deployment
+
+## Scripts
 
 ```bash
-apify run
+npm install
+npm run build     # compile TypeScript to dist/
+npm run lint      # ESLint (src and test)
+npm run format    # Prettier
+npm test          # unit + end-to-end tests (node:test)
+npm start         # run locally with tsx
 ```
 
-## Deploy to Apify
+## Credentials
 
-### Connect Git repository to Apify
+The Actor uses our Tomba account. Users never enter an API key: credentials come from environment variables, never from the input:
 
-If you've created a Git repository for the project, you can easily connect to Apify:
+| Variable             | Description                                        |
+| -------------------- | -------------------------------------------------- |
+| `TOMBA_API_KEY`      | Tomba API key (`ta_…`)                             |
+| `TOMBA_API_SECRET`   | Tomba secret (`ts_…`)                              |
+| `TOMBA_API_ENDPOINT` | Optional API base URL; only used by the test suite |
 
-1. Go to [Actor creation page](https://console.apify.com/actors/new)
-2. Click on **Link Git Repository** button
+`.actor/actor.json` maps the variables to Apify secrets:
 
-### Push project on your local machine to Apify
+```bash
+apify secrets add tombaApiKey ta_xxxxxxxxxxxxxxxxxxxx
+apify secrets add tombaApiSecret ts_xxxxxxxxxxxxxxxxxxxx
+apify push
+```
 
-You can also deploy the project on your local machine to Apify without the need for the Git repository.
+Run locally:
 
-1. Log in to Apify. You will need to provide your [Apify API Token](https://console.apify.com/account/integrations) to complete this action.
+```bash
+TOMBA_API_KEY=ta_… TOMBA_API_SECRET=ts_… npm start
+```
 
-    ```bash
-    apify login
-    ```
+There is no client-side rate limit: requests run in parallel (`maxConcurrency`, 1–50) and 429/5xx responses are retried with exponential backoff, honoring `Retry-After`.
 
-2. Deploy your Actor. This command will deploy and build the Actor on the Apify Platform. You can find your newly created Actor under [Actors -> My Actors](https://console.apify.com/actors?tab=my).
+## Deploy
 
-    ```bash
-    apify push
-    ```
+- **From Git**: on the [Actor creation page](https://console.apify.com/actors/new), click **Link Git Repository**
+- **From your machine**: `apify login`, then `apify push`
 
-## Documentation reference
+## Pricing (pay per event)
 
-To learn more about Apify and Actors, take a look at the following resources:
+In **Apify Console → Publication → Monetization**, choose **Pay per event** and add a single event:
 
-- [Apify SDK for JavaScript documentation](https://docs.apify.com/sdk/js)
-- [Apify SDK for Python documentation](https://docs.apify.com/sdk/python)
-- [Apify Platform documentation](https://docs.apify.com/platform)
-- [Join our developer community on Discord](https://discord.com/invite/jyEM2PRvMU)
+| Event           | Price    | Charged when                                       |
+| --------------- | -------- | -------------------------------------------------- |
+| `tomba-request` | $0.00312 | Once per credit of a billable response (see below) |
+
+Phone Finder costs credits (Tomba: "5 search credits, or 1 when the request includes domain"), charged as `tomba-request` events with `count`:
+
+- 1 credit when the search includes a `domain` (alone or with `email`/`linkedin`)
+- 5 credits (`PHONE_CREDITS`, $0.0156) for an `email` or `linkedin` search without a `domain`
+
+`searchCredits()` in `src/main.ts` computes this and passes it to `callTomba()` as the charge count; the item's `chargedCredits` is `res.chargedCount`. The `full` option does not change the price. The former `phone-finder-request` event is no longer used and can be removed from the pricing configuration.
+
+`isBillable()` in `src/tomba.ts` mirrors Tomba's billing:
+
+| Tomba outcome                                                | Charged |
+| ------------------------------------------------------------ | ------- |
+| JSON with non-empty `data`, including `valid: false` numbers | Yes     |
+| Error status (4xx, 5xx, including 422 and 429)               | No      |
+| Success with empty or null `data` (no number on record)      | No      |
+| Success with an `errors` object                              | No      |
+| Non-JSON body (reported as 502)                              | No      |
+| Cache hit                                                    | No      |
+
+## Architecture
+
+- `src/tomba.ts`: shared helper, identical in every Tomba Actor. It handles credentials, caching (`tomba-cache` key-value store), retries with exponential backoff, pay-per-event charging, budget reservation, the concurrency pool and resume state.
+- `src/main.ts`: input normalization (emails lowercased, domains cleaned, LinkedIn URLs trimmed, empty searches skipped, duplicates removed), credit calculation and output mapping. The Tomba `data` object is spread into the row, followed by `source`, `chargedCredits`, `charged`, `cached` and `error`. `maxResults` counts valid numbers only.
+- The SDK call is `Phone.finder({ email, domain, linkedin, full, webhook_url })` → `GET /phone-finder`. The global `full` and `webhookUrl` inputs are added to every search, but only when set (`full` true, `webhookUrl` non-blank); they are part of the cache key.
+- The `tomba` SDK v1.1.1 resolves every call to `{ data, rateLimit }`, where `data` is the response body. Its `.d.ts` types still declare the old return type, so always go through `callTomba()`.
+
+## Tests
+
+- `test/tomba.test.ts`: unit tests for the shared helper (identical in every Actor)
+- `test/main.test.ts`: end-to-end tests that run `src/main.ts` against a local mock Tomba API
+- `test/helpers.ts`: mock server and Actor runner (identical in every Actor)
+
+Locally, the Apify SDK prices every event at $1 when `ACTOR_TEST_PAY_PER_EVENT=true`, so the tests use `maxTotalChargeUsd` as an event count.

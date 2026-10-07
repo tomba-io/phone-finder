@@ -1,14 +1,14 @@
 {
     "name": "phone-finder",
-    "version": "0.0.2",
+    "version": "1.0.0",
     "type": "module",
     "description": "Find phone numbers and related information using the Tomba API.",
     "engines": {
         "node": ">=18.0.0"
     },
     "dependencies": {
-        "apify": "^3.4.2",
-        "tomba": "^1.0.4"
+        "apify": "^3.7.2",
+        "tomba": "^1.1.1"
     },
     "devDependencies": {
         "@apify/eslint-config": "^1.0.0",
@@ -28,12 +28,12 @@
         "start:prod": "node dist/main.js",
         "start:dev": "tsx src/main.ts",
         "build": "tsc",
-        "lint": "eslint",
-        "lint:fix": "eslint --fix",
+        "lint": "eslint src test",
+        "lint:fix": "eslint src test --fix",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "release": "standard-version  && git push --follow-tags origin main",
-        "test": "echo \"Error: oops, the Actor has no tests yet, sad!\" && exit 1"
+        "test": "node --import tsx --test test/*.test.ts"
     },
     "author": "It's not you it's me",
     "license": "ISC"

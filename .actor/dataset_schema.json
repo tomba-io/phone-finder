@@ -68,6 +68,22 @@
                         "description": "Value used in the search query"
                     }
                 }
+            },
+            "error": {
+                "type": ["string", "null"],
+                "description": "Error message if no phone number was found or the search failed"
+            },
+            "chargedCredits": {
+                "type": "integer",
+                "description": "Credits billed for this search ($0.00312 each): 1 when the search includes a domain, otherwise 5. 0 when not charged"
+            },
+            "charged": {
+                "type": "boolean",
+                "description": "Whether this request was charged (pay-per-event)"
+            },
+            "cached": {
+                "type": "boolean",
+                "description": "Whether the result came from the cache (free)"
             }
         },
         "required": ["valid"]
@@ -124,7 +140,11 @@
                     "line_type",
                     "carrier",
                     "timezones",
-                    "source"
+                    "source",
+                    "error",
+                    "chargedCredits",
+                    "charged",
+                    "cached"
                 ]
             },
             "display": {

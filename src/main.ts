@@ -1,119 +1,161 @@
-// Apify SDK - toolkit for building Apify Actors (Read more at https://docs.apify.com/sdk/js/)
-import { Actor } from 'apify';
-// Tomba SDK for phone finding
-import { Phone, TombaClient } from 'tomba';
+import { Actor, log } from 'apify';
+import { Phone } from 'tomba';
 
-interface ActorInput {
-    tombaApiKey: string;
-    tombaApiSecret: string;
-    searches?: {
-        email?: string;
-        domain?: string;
-        linkedin?: string;
-    }[];
+import type { RunOptions } from './tomba.js';
+import {
+    callTomba,
+    EVENT_REQUEST,
+    logSummary,
+    normalizeDomain,
+    normalizeEmail,
+    PHONE_CREDITS,
+    runPool,
+    setupTomba,
+    stop,
+    unique,
+    useRunState,
+} from './tomba.js';
+
+interface SearchQuery {
+    email?: string;
+    domain?: string;
+    linkedin?: string;
+}
+
+interface PhoneFinderInput extends RunOptions {
+    searches: SearchQuery[];
     maxResults?: number;
+    full?: boolean;
+    webhookUrl?: string;
 }
 
-// Rate limiting: 150 requests per minute
-const RATE_LIMIT = 150;
-const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute in milliseconds
-let requestCount = 0;
-let windowStart = Date.now();
-
-async function rateLimitedRequest<T>(requestFn: () => Promise<T>): Promise<T> {
-    const now = Date.now();
-
-    // Reset counter if window has passed
-    if (now - windowStart > RATE_LIMIT_WINDOW) {
-        requestCount = 0;
-        windowStart = now;
-    }
-
-    // Check if we've hit the rate limit
-    if (requestCount >= RATE_LIMIT) {
-        const waitTime = RATE_LIMIT_WINDOW - (now - windowStart);
-        console.log(`Rate limit reached. Waiting ${Math.ceil(waitTime / 1000)} seconds...`);
-        await new Promise<void>((resolve) => {
-            setTimeout(() => resolve(), waitTime);
-        });
-
-        // Reset after waiting
-        requestCount = 0;
-        windowStart = Date.now();
-    }
-
-    requestCount++;
-    return await requestFn();
+interface PhoneFinderParams extends SearchQuery {
+    full?: boolean;
+    webhook_url?: string;
 }
 
-// The init() call configures the Actor for its environment
 await Actor.init();
 
-try {
-    // Get input from the Actor
-    const input = (await Actor.getInput()) as ActorInput;
-
-    if (!input) {
-        throw new Error('No input provided');
-    }
-
-    if (!input.tombaApiKey || !input.tombaApiSecret) {
-        throw new Error('Tomba API key and secret are required');
-    }
-
-    console.log('Starting Tomba Phone Finder Actor...');
-    console.log(`Processing ${input.searches?.length || 0} search queries`);
-
-    // Initialize Tomba client
-    const client = new TombaClient();
-    const phone = new Phone(client);
-
-    client.setKey(input.tombaApiKey).setSecret(input.tombaApiSecret);
-
-    const results: unknown[] = [];
-    const maxResults = input.maxResults || 50;
-
-    // Process search queries
-    if (input.searches && input.searches.length > 0) {
-        console.log(`Processing ${input.searches.length} search queries...`);
-
-        for (const searchQuery of input.searches) {
-            if (results.length >= maxResults) break;
-
-            try {
-                console.log(`Finding phone for:`, searchQuery);
-
-                // Use Tomba's phone finder method with rate limiting
-                const tombaResult = await rateLimitedRequest(async () => phone.finder(searchQuery));
-
-                if (tombaResult && tombaResult.data) {
-                    // Handle the response structure - using any type since SDK types may not match
-                    const phoneData = tombaResult.data;
-
-                    if (phoneData.valid) {
-                        results.push(phoneData);
-                        console.log(`Found phone: ${phoneData.local_format}`);
-                    }
-                }
-            } catch (error) {
-                console.log(`Error processing search query:`, searchQuery, error);
-            }
-        }
-    }
-
-    // Save results to dataset
-    if (results.length > 0) {
-        await Actor.pushData(results);
-        console.log(`Found ${results.length} unique phone numbers`);
-    }
-
-    // Log summary
-    console.log('=== SUMMARY ===');
-    console.log(`Total phone numbers found: ${results.length}`);
-} catch (error) {
-    console.error('Actor failed:', error);
-    throw error;
+const input = await Actor.getInput<PhoneFinderInput>();
+if (!input?.searches?.length) {
+    await Actor.fail('Input must contain at least one search query in "searches".');
 }
 
-// Gracefully exit the Actor process
+const { searches: rawSearches, maxResults = 50, full = false, webhookUrl, ...runOptions } = input!;
+const webhook = typeof webhookUrl === 'string' && webhookUrl.trim() ? webhookUrl.trim() : undefined;
+const client = await setupTomba(runOptions);
+const phone = new Phone(client);
+const state = await useRunState();
+
+/** Normalize a search query, keeping only non-empty fields. */
+function normalizeSearch(search: SearchQuery): SearchQuery {
+    const result: SearchQuery = {};
+    const email = typeof search?.email === 'string' ? normalizeEmail(search.email) : '';
+    const domain = typeof search?.domain === 'string' ? normalizeDomain(search.domain) : '';
+    const linkedin = typeof search?.linkedin === 'string' ? search.linkedin.trim() : '';
+    if (email) result.email = email;
+    if (domain) result.domain = domain;
+    if (linkedin) result.linkedin = linkedin;
+    return result;
+}
+
+function searchKey(search: SearchQuery): string {
+    if (!search.email && !search.domain && !search.linkedin) return '';
+    return JSON.stringify([search.email ?? '', search.domain ?? '', search.linkedin ?? '']);
+}
+
+function searchSource(search: SearchQuery): { search_type: string; search_value: string } {
+    if (search.email) return { search_type: 'email', search_value: search.email };
+    if (search.linkedin) return { search_type: 'linkedin', search_value: search.linkedin };
+    return { search_type: 'domain', search_value: search.domain ?? '' };
+}
+
+/** Request parameters; the global options are only sent when set. */
+function requestParams(search: SearchQuery): PhoneFinderParams {
+    const params: PhoneFinderParams = { ...search };
+    if (full) params.full = true;
+    if (webhook) params.webhook_url = webhook;
+    return params;
+}
+
+/** Phone Finder pricing: 1 credit when the request includes a domain, otherwise 5 (email or LinkedIn only). */
+function searchCredits(search: SearchQuery): number {
+    return search.domain ? 1 : PHONE_CREDITS;
+}
+
+const normalized = rawSearches.map(normalizeSearch);
+const emptyCount = normalized.filter((search) => !searchKey(search)).length;
+if (emptyCount > 0) {
+    log.warning(`Skipping ${emptyCount} search queries without email, domain or linkedin.`);
+}
+
+const searches = unique(normalized, searchKey);
+const pending = searches.filter((search) => !state.done[searchKey(search)]);
+if (pending.length < searches.length) {
+    log.info(`Resuming: ${searches.length - pending.length} search queries already processed.`);
+}
+
+let pushed = 0;
+const startedAt = Date.now();
+log.info(`Finding phone numbers for ${pending.length} search queries`, { full, webhook: Boolean(webhook) });
+
+await runPool(pending, async (search) => {
+    if (pushed >= maxResults) {
+        stop();
+        return;
+    }
+
+    const params = requestParams(search);
+    const res = await callTomba(
+        'phone-finder',
+        { ...params },
+        async () => phone.finder({ ...params }),
+        EVENT_REQUEST,
+        searchCredits(search),
+    );
+    if (res.skipped) return;
+
+    const source = searchSource(search);
+    const data =
+        res.data && typeof res.data === 'object' && !Array.isArray(res.data) && Object.keys(res.data).length > 0
+            ? (res.data as Record<string, unknown>)
+            : undefined;
+    const base = {
+        email: search.email ?? null,
+        domain: search.domain ?? null,
+        linkedin: search.linkedin ?? null,
+    };
+
+    if (data) {
+        const valid = data.valid === true;
+        if (valid) pushed++;
+        await Actor.pushData({
+            ...base,
+            ...data,
+            source,
+            chargedCredits: res.chargedCount ?? 0,
+            charged: res.charged,
+            cached: res.cached,
+            ...(valid ? {} : { error: 'No valid phone number found' }),
+        });
+        const found = valid ? String(data.intl_format ?? data.local_format ?? 'phone found') : 'no valid phone number';
+        log.info(`${source.search_value}: ${found}${res.cached ? ' (cached)' : ''}`);
+    } else {
+        await Actor.pushData({
+            ...base,
+            valid: null,
+            source,
+            chargedCredits: 0,
+            charged: res.charged,
+            cached: res.cached,
+            error: res.error ?? 'No phone number found',
+        });
+        log.info(`${source.search_value}: ${res.error ?? 'no phone number found'}`);
+    }
+
+    state.done[searchKey(search)] = true;
+});
+
+logSummary('Phone Finder', searches.length, startedAt);
+
 await Actor.exit();

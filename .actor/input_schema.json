@@ -4,24 +4,6 @@
     "type": "object",
     "schemaVersion": 1,
     "properties": {
-        "tombaApiKey": {
-            "title": "Tomba API Key",
-            "type": "string",
-            "description": "Your Tomba API key (ta_xxxx). Get it from https://app.tomba.io/api",
-            "editor": "textfield",
-            "isSecret": true,
-            "example": "ta_xxxxxxxxxxxxxxxxxxxx",
-            "prefill": "ta_xxxxxxxxxxxxxxxxxxxx"
-        },
-        "tombaApiSecret": {
-            "title": "Tomba Secret Key",
-            "type": "string",
-            "description": "Your Tomba secret key (ts_xxxx). Get it from https://app.tomba.io/api",
-            "editor": "textfield",
-            "isSecret": true,
-            "example": "ts_xxxxxxxxxxxxxxxxxxxx",
-            "prefill": "ts_xxxxxxxxxxxxxxxxxxxx"
-        },
         "searches": {
             "title": "Search Queries",
             "type": "array",
@@ -73,7 +55,58 @@
             "maximum": 1000,
             "default": 50,
             "example": 50
+        },
+        "full": {
+            "title": "Full phone record",
+            "type": "boolean",
+            "description": "Ask Tomba for the full phone record it has stored for each search (sent as `full=true`). Applies to every search and does not change the price.",
+            "default": false,
+            "editor": "checkbox"
+        },
+        "webhookUrl": {
+            "title": "Webhook URL",
+            "type": "string",
+            "description": "Optional URL that Tomba also sends each result to (sent as `webhook_url` on every search). Must start with http:// or https://.",
+            "pattern": "^https?://",
+            "editor": "textfield"
+        },
+        "maxConcurrency": {
+            "title": "Max concurrency",
+            "type": "integer",
+            "description": "How many Tomba requests run in parallel. There is no rate limit, so raise it for large lists.",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10,
+            "editor": "number",
+            "sectionCaption": "Run options",
+            "sectionDescription": "Concurrency, retry and cache settings. The defaults work well for most runs."
+        },
+        "maxRetries": {
+            "title": "Max retries",
+            "type": "integer",
+            "description": "How many times to retry a request after a network error, 429 or 5xx response (exponential backoff). Failed requests are never charged.",
+            "minimum": 0,
+            "maximum": 10,
+            "default": 3,
+            "editor": "number"
+        },
+        "useCache": {
+            "title": "Use cache",
+            "type": "boolean",
+            "description": "Reuse results from previous runs for identical requests. Cached results are free.",
+            "default": true,
+            "editor": "checkbox"
+        },
+        "cacheTtlHours": {
+            "title": "Cache TTL (hours)",
+            "type": "integer",
+            "description": "How long cached results stay valid. 0 disables the cross-run cache.",
+            "minimum": 0,
+            "maximum": 720,
+            "default": 24,
+            "editor": "number",
+            "unit": "hours"
         }
     },
-    "required": ["tombaApiKey", "tombaApiSecret", "searches"]
+    "required": ["searches"]
 }
