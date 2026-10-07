@@ -155,6 +155,26 @@ Every row shows `chargedCredits`, `charged` and `cached`, so you always know wha
 - **Cache**: repeat searches within 24 hours are free
 - **Clean input**: emails and domains in any format are cleaned up, and duplicate searches are removed
 
+## Real-time API
+
+Need a phone number instantly inside your own app or CRM? This Actor also runs as a **real-time API** (Apify Standby mode): no run to start, no dataset to fetch, just an HTTP request that returns JSON in seconds. Pricing is the same (add a `domain` to pay 1 credit instead of 5).
+
+```bash
+curl "https://<your-standby-url>/?email=jane.doe@stripe.com&domain=stripe.com" \
+  -H "Authorization: Bearer <YOUR_APIFY_TOKEN>"
+```
+
+A GET request runs one search built from `email`, `domain` and `linkedin` (any combination); `full` and `webhookUrl` work too. To run several searches at once, `POST` the same JSON input as a normal run:
+
+```bash
+curl -X POST "https://<your-standby-url>/" \
+  -H "Authorization: Bearer <YOUR_APIFY_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"searches": [{"email": "jane.doe@stripe.com", "domain": "stripe.com"}, {"linkedin": "https://www.linkedin.com/in/janedoe"}]}'
+```
+
+The response is `{ "items": [...] }`, with the same rows as the dataset. Find your Standby URL and the full OpenAPI description in the **API** tab of this Actor.
+
 ## Integrations
 
 Run it on a schedule, call it from the Apify API, or connect it to Zapier, Make, Google Sheets, HubSpot, Slack and hundreds of other apps with [Apify integrations](https://docs.apify.com/platform/integrations). Webhooks let you trigger your own workflow as soon as a run finishes.

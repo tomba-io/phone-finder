@@ -1,0 +1,33 @@
+{
+    "actorKeyValueStoreSchemaVersion": 1,
+    "title": "Tomba Phone Finder storage",
+    "description": "Records the Actor keeps in its default key-value store. Results are in the dataset.",
+    "collections": {
+        "input": {
+            "title": "Input",
+            "description": "The input of this run.",
+            "key": "INPUT",
+            "contentTypes": ["application/json"]
+        },
+        "progress": {
+            "title": "Progress",
+            "description": "Searches already processed, so a migrated or restarted run continues without charging again.",
+            "key": "TOMBA_STATE",
+            "contentTypes": ["application/json"],
+            "jsonSchema": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                    "done": {
+                        "type": "object",
+                        "description": "Processed searches (JSON [email, domain, linkedin] keys) mapped to true",
+                        "additionalProperties": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "required": ["done"]
+            }
+        }
+    }
+}

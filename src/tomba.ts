@@ -58,7 +58,7 @@ export const stats = {
     retries: 0,
 };
 
-const CACHE_STORE_NAME = 'tomba-cache';
+const CACHE_STORE_PREFIX = 'tomba-cache';
 const BASE_DELAY_MS = 1000;
 const MAX_DELAY_MS = 30000;
 const NETWORK_ERROR = /ECONN|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|EPIPE|socket hang up|timeout|network/i;
@@ -93,9 +93,32 @@ export async function setupTomba(runOptions: RunOptions = {}): Promise<TombaClie
     if (process.env.TOMBA_API_ENDPOINT) client.setEndpoint(process.env.TOMBA_API_ENDPOINT);
 
     if (options.useCache && options.cacheTtlHours > 0) {
-        cacheStore = await Actor.openKeyValueStore(CACHE_STORE_NAME);
+        try {
+            cacheStore = await Actor.openKeyValueStore(cacheStoreName());
+        } catch (err) {
+            // E.g. "Insufficient permissions" under limited permissions: never fail the run because of the cache.
+            log.warning('Cross-run cache is unavailable; results are cached for this run only.', {
+                error: (err as Error).message,
+            });
+            cacheStore = undefined;
+        }
     }
 
+    return client;
+}
+
+/**
+ * Name of the cross-run cache store. It is per Actor: with limited permissions an Actor can only open
+ * named storages it created itself, so the Tomba Actors must not share one store.
+ */
+export function cacheStoreName(): string {
+    const actorId = Actor.getEnv().actorId ?? process.env.ACTOR_ID;
+    return actorId ? `${CACHE_STORE_PREFIX}-${actorId}` : CACHE_STORE_PREFIX;
+}
+
+/** The Tomba client created by setupTomba(). */
+export function getClient(): TombaClient {
+    if (!client) throw new Error('setupTomba() must be called first');
     return client;
 }
 
@@ -202,15 +225,19 @@ export async function callTomba(
     }
 }
 
-/** Run `worker` over `items` with bounded concurrency; stops picking new items once `isStopped()` is true. */
+/**
+ * Run `worker` over `items` with bounded concurrency. Stops picking new items once the charge limit
+ * is reached (`isStopped()`) or `shouldStop()` returns true (e.g. maxResults reached for this run).
+ */
 export async function runPool<T>(
     items: T[],
     worker: (item: T, index: number) => Promise<void>,
     concurrency = options.maxConcurrency,
+    shouldStop: () => boolean = () => false,
 ): Promise<void> {
     let next = 0;
     const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-        while (!stopped && next < items.length) {
+        while (!stopped && !shouldStop() && next < items.length) {
             const index = next++;
             await worker(items[index], index);
         }

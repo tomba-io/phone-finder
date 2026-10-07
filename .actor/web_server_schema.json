@@ -1,0 +1,346 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Tomba Phone Finder API",
+        "version": "1.0.0",
+        "description": "Real-time API (Apify Standby mode). Find the phone number linked to an email address, a company domain or a LinkedIn profile. One credit costs $0.00312: 5 credits ($0.0156) per search, or 1 credit ($0.00312) when the search includes a domain. Searches with no phone number on record, errors and cached results are free."
+    },
+    "paths": {
+        "/": {
+            "get": {
+                "summary": "Find a phone number for one search",
+                "description": "Without query parameters, returns a short usage note (also used as the readiness probe).",
+                "parameters": [
+                    {
+                        "name": "email",
+                        "in": "query",
+                        "description": "Email address to look up. 5 credits, or 1 when `domain` is also given.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "jane.doe@stripe.com"
+                    },
+                    {
+                        "name": "domain",
+                        "in": "query",
+                        "description": "Company domain to look up, alone or with `email` / `linkedin` (1 credit). URLs are cleaned up.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "stripe.com"
+                    },
+                    {
+                        "name": "linkedin",
+                        "in": "query",
+                        "description": "LinkedIn profile URL to look up. 5 credits, or 1 when `domain` is also given.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "https://www.linkedin.com/in/janedoe"
+                    },
+                    {
+                        "name": "full",
+                        "in": "query",
+                        "description": "Ask Tomba for the full phone record it has stored (sent as `full=true`). Does not change the price.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    },
+                    {
+                        "name": "webhookUrl",
+                        "in": "query",
+                        "description": "Optional URL that Tomba also sends the result to (http:// or https://).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "https://hooks.example.com/tomba"
+                    },
+                    {
+                        "name": "maxResults",
+                        "in": "query",
+                        "description": "Maximum number of valid phone numbers to return (default 50).",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 50
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/Results"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "402": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            },
+            "post": {
+                "summary": "Find phone numbers for several searches using a JSON input",
+                "description": "Accepts the same JSON input as a normal Actor run.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "searches": {
+                                        "type": "array",
+                                        "description": "Array of search queries to find phone numbers. Each query can contain email, domain, or LinkedIn profile.",
+                                        "example": [
+                                            {
+                                                "email": "john@example.com"
+                                            },
+                                            {
+                                                "domain": "example.com"
+                                            },
+                                            {
+                                                "linkedin": "https://linkedin.com/in/johndoe"
+                                            }
+                                        ],
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "email": {
+                                                    "type": "string",
+                                                    "description": "Email address to find phone number for"
+                                                },
+                                                "domain": {
+                                                    "type": "string",
+                                                    "description": "Domain to search for phone numbers"
+                                                },
+                                                "linkedin": {
+                                                    "type": "string",
+                                                    "description": "LinkedIn profile URL to find phone number for"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "maxResults": {
+                                        "type": "integer",
+                                        "description": "Maximum number of phone numbers to find. Default is 50.",
+                                        "minimum": 1,
+                                        "maximum": 1000,
+                                        "default": 50,
+                                        "example": 50
+                                    },
+                                    "full": {
+                                        "type": "boolean",
+                                        "description": "Ask Tomba for the full phone record it has stored for each search (sent as `full=true`). Applies to every search and does not change the price.",
+                                        "default": false
+                                    },
+                                    "webhookUrl": {
+                                        "type": "string",
+                                        "description": "Optional URL that Tomba also sends each result to (sent as `webhook_url` on every search). Must start with http:// or https://.",
+                                        "pattern": "^https?://"
+                                    },
+                                    "maxConcurrency": {
+                                        "type": "integer",
+                                        "description": "How many Tomba requests run in parallel. There is no rate limit, so raise it for large lists.",
+                                        "minimum": 1,
+                                        "maximum": 50,
+                                        "default": 10
+                                    },
+                                    "maxRetries": {
+                                        "type": "integer",
+                                        "description": "How many times to retry a request after a network error, 429 or 5xx response (exponential backoff). Failed requests are never charged.",
+                                        "minimum": 0,
+                                        "maximum": 10,
+                                        "default": 3
+                                    },
+                                    "useCache": {
+                                        "type": "boolean",
+                                        "description": "Reuse results from previous runs for identical requests. Cached results are free.",
+                                        "default": true
+                                    },
+                                    "cacheTtlHours": {
+                                        "type": "integer",
+                                        "description": "How long cached results stay valid. 0 disables the cross-run cache.",
+                                        "minimum": 0,
+                                        "maximum": 720,
+                                        "default": 24
+                                    }
+                                },
+                                "required": ["searches"],
+                                "example": {
+                                    "searches": [
+                                        {
+                                            "email": "jane.doe@stripe.com",
+                                            "domain": "stripe.com"
+                                        },
+                                        {
+                                            "linkedin": "https://www.linkedin.com/in/janedoe"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/Results"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "402": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "responses": {
+            "Results": {
+                "description": "One row per search, in the same format as the dataset items.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "items": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/PhoneResult"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "Error": {
+                "description": "Invalid input (400) or the run's max charge limit was reached (402).",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "schemas": {
+            "PhoneResult": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Email address associated with the phone number"
+                    },
+                    "domain": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Domain associated with the phone number"
+                    },
+                    "linkedin": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "LinkedIn profile associated with the phone number"
+                    },
+                    "valid": {
+                        "type": "boolean",
+                        "nullable": true,
+                        "description": "Whether the phone number is valid"
+                    },
+                    "local_format": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Phone number in local format"
+                    },
+                    "intl_format": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Phone number in international format"
+                    },
+                    "e164_format": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Phone number in E.164 format"
+                    },
+                    "rfc3966_format": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Phone number in RFC3966 format"
+                    },
+                    "country_code": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Country code of the phone number"
+                    },
+                    "line_type": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Type of phone line (mobile, landline, etc.)"
+                    },
+                    "carrier": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Phone carrier/provider information"
+                    },
+                    "timezones": {
+                        "type": "array",
+                        "nullable": true,
+                        "description": "Timezone information for the phone number location",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "source": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "Source information used to find this phone number",
+                        "properties": {
+                            "search_type": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "Type of search performed (email, domain, linkedin)"
+                            },
+                            "search_value": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "Value used in the search query"
+                            }
+                        }
+                    },
+                    "error": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Error message if no phone number was found or the search failed"
+                    },
+                    "chargedCredits": {
+                        "type": "integer",
+                        "description": "Credits billed for this search ($0.00312 each): 1 when the search includes a domain, otherwise 5. 0 when not charged"
+                    },
+                    "charged": {
+                        "type": "boolean",
+                        "description": "Whether this request was charged (pay-per-event)"
+                    },
+                    "cached": {
+                        "type": "boolean",
+                        "description": "Whether the result came from the cache (free)"
+                    }
+                }
+            }
+        }
+    }
+}

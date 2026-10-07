@@ -12,10 +12,14 @@
     "input": "./input_schema.json",
     "output": "./output_schema.json",
     "storages": {
-        "dataset": "./dataset_schema.json"
+        "dataset": "./dataset_schema.json",
+        "keyValueStore": "./key_value_store_schema.json"
     },
     "environmentVariables": {
         "TOMBA_API_KEY": "@tombaApiKey",
         "TOMBA_API_SECRET": "@tombaApiSecret"
-    }
+    },
+    "usesStandbyMode": true,
+    "webServerSchema": "./web_server_schema.json",
+    "defaultMemoryMbytes": 256
 }

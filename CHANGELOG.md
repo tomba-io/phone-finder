@@ -20,6 +20,9 @@ All notable changes to this project will be documented in this file. See [standa
 - Search queries are normalized and deduplicated
 - Each dataset item now includes `charged` and `cached`
 - Searches without a valid phone number, and failed searches, now produce a dataset item with `error` instead of being dropped
+- Real-time API (Apify Standby mode): `GET /?email=…` (or `domain`, `linkedin`) or `POST /` with the run input returns results as JSON, with an OpenAPI web server schema
+- Key-value store schema for the default store (`INPUT`, `TOMBA_STATE`)
+- Default memory set to 256 MB
 
 ### Dependencies
 

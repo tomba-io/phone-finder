@@ -3,7 +3,7 @@
 import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -184,4 +184,135 @@ export async function removeStorage(storageDir: string): Promise<void> {
 /** Total number of charged events across all event names. */
 export function totalCharges(result: RunResult): number {
     return Object.values(result.chargeCounts).reduce((a, b) => a + b, 0);
+}
+
+export interface StandbyActor {
+    /** Base URL of the Actor's HTTP server. */
+    url: string;
+    storageDir: string;
+    /** GET or POST a request to the Actor and parse the JSON response. */
+    call: (
+        path: string,
+        init?: { method?: string; body?: unknown; headers?: Record<string, string> },
+    ) => Promise<{ status: number; body: Record<string, unknown> }>;
+    /** Stop the Actor and return its log output and charges. */
+    stop: () => Promise<{ output: string; chargeCounts: Record<string, number> }>;
+}
+
+async function freePort(): Promise<number> {
+    const server = createServer();
+    await new Promise<void>((resolve) => {
+        server.listen(0, '127.0.0.1', resolve);
+    });
+    const { port } = server.address() as AddressInfo;
+    await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+    });
+    return port;
+}
+
+async function httpCall(
+    url: string,
+    init: { method?: string; body?: unknown; headers?: Record<string, string> } = {},
+): Promise<{ status: number; body: Record<string, unknown> }> {
+    let payload: string | undefined;
+    if (typeof init.body === 'string') payload = init.body;
+    else if (init.body !== undefined) payload = JSON.stringify(init.body);
+    return new Promise((resolve, reject) => {
+        const req = httpRequest(
+            url,
+            {
+                method: init.method ?? (payload ? 'POST' : 'GET'),
+                headers: { 'content-type': 'application/json', ...init.headers },
+            },
+            (res) => {
+                const chunks: Buffer[] = [];
+                res.on('data', (c: Buffer) => chunks.push(c));
+                res.on('end', () => {
+                    const text = Buffer.concat(chunks).toString();
+                    let body: Record<string, unknown> = {};
+                    try {
+                        body = JSON.parse(text);
+                    } catch {
+                        body = { raw: text };
+                    }
+                    resolve({ status: res.statusCode ?? 0, body });
+                });
+            },
+        );
+        req.on('error', reject);
+        if (payload) req.write(payload);
+        req.end();
+    });
+}
+
+/** Start the Actor in Standby mode (real-time HTTP API) and wait until it is ready. */
+export async function startStandbyActor(
+    options: { endpoint?: string; maxTotalChargeUsd?: number; withCredentials?: boolean } = {},
+): Promise<StandbyActor> {
+    const storageDir = await mkdtemp(join(tmpdir(), 'tomba-standby-test-'));
+    const port = await freePort();
+    const env: NodeJS.ProcessEnv = {
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        CRAWLEE_STORAGE_DIR: storageDir,
+        APIFY_LOG_LEVEL: 'INFO',
+        APIFY_META_ORIGIN: 'STANDBY',
+        ACTOR_WEB_SERVER_PORT: String(port),
+        ACTOR_TEST_PAY_PER_EVENT: 'true',
+        ACTOR_USE_CHARGING_LOG_DATASET: 'true',
+    };
+    if (options.withCredentials !== false) {
+        env.TOMBA_API_KEY = 'ta_test_key';
+        env.TOMBA_API_SECRET = 'ts_test_secret';
+    }
+    if (options.endpoint) env.TOMBA_API_ENDPOINT = options.endpoint;
+    if (options.maxTotalChargeUsd !== undefined) env.ACTOR_MAX_TOTAL_CHARGE_USD = String(options.maxTotalChargeUsd);
+
+    const child = spawn(process.execPath, ['--import', 'tsx', 'src/main.ts'], { env, cwd: process.cwd() });
+    let output = '';
+    child.stdout.on('data', (d: Buffer) => {
+        output += d.toString();
+    });
+    child.stderr.on('data', (d: Buffer) => {
+        output += d.toString();
+    });
+    const exited = new Promise<void>((resolve) => {
+        child.on('close', () => resolve());
+    });
+
+    const url = `http://127.0.0.1:${port}`;
+    const deadline = Date.now() + 30_000;
+    for (;;) {
+        if (child.exitCode !== null) throw new Error(`Standby Actor exited early\n${output}`);
+        try {
+            const res = await httpCall(`${url}/`, { headers: { 'x-apify-container-server-readiness-probe': '1' } });
+            if (res.status === 200) break;
+        } catch {
+            // not listening yet
+        }
+        if (Date.now() > deadline) {
+            child.kill('SIGKILL');
+            throw new Error(`Standby Actor did not become ready\n${output}`);
+        }
+        await new Promise((r) => {
+            setTimeout(r, 100);
+        });
+    }
+
+    return {
+        url,
+        storageDir,
+        call: async (path, init) => httpCall(`${url}${path}`, init),
+        stop: async () => {
+            child.kill('SIGTERM');
+            await exited;
+            const charges = (await readDataset(storageDir, 'charging_log')) as ChargeLogEntry[];
+            const chargeCounts: Record<string, number> = {};
+            for (const c of charges)
+                chargeCounts[c.eventName] = (chargeCounts[c.eventName] ?? 0) + (c.chargedCount ?? 1);
+            await removeStorage(storageDir);
+            return { output, chargeCounts };
+        },
+    };
 }

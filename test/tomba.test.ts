@@ -93,6 +93,47 @@ describe('phone data', () => {
     });
 });
 
+describe('cacheStoreName', () => {
+    it("is unique per Actor so limited-permission runs never open another Actor's store", () => {
+        const previous = process.env.ACTOR_ID;
+        try {
+            process.env.ACTOR_ID = 'AbC123xyz';
+            assert.equal(T.cacheStoreName(), 'tomba-cache-AbC123xyz');
+            delete process.env.ACTOR_ID;
+            assert.equal(T.cacheStoreName(), 'tomba-cache');
+        } finally {
+            if (previous === undefined) delete process.env.ACTOR_ID;
+            else process.env.ACTOR_ID = previous;
+        }
+    });
+});
+
+describe('setupTomba without cache permissions', () => {
+    it('keeps working with an in-run cache when the cache store cannot be opened', async () => {
+        const original = Actor.openKeyValueStore.bind(Actor);
+        Actor.openKeyValueStore = async () => {
+            throw new Error('Insufficient permissions for the key-value store.');
+        };
+        try {
+            await T.setupTomba({ maxRetries: 1, useCache: true, cacheTtlHours: 1, maxConcurrency: 4 });
+            const p = { cachePermissionTest: true };
+            let calls = 0;
+            const fn = async () => {
+                calls++;
+                return { data: { data: [1] }, rateLimit: {} };
+            };
+            const first = await T.callTomba('perm', p, fn);
+            const second = await T.callTomba('perm', p, fn);
+            assert.equal(first.charged, true);
+            assert.equal(second.cached, true);
+            assert.equal(calls, 1);
+        } finally {
+            Actor.openKeyValueStore = original;
+            await T.setupTomba({ maxRetries: 1, useCache: true, cacheTtlHours: 1, maxConcurrency: 4 });
+        }
+    });
+});
+
 describe('runPool', () => {
     it('processes every item with bounded concurrency', async () => {
         let active = 0;
